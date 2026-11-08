@@ -1,0 +1,26 @@
+# ==============================================================================
+# REGISTOS DNS DE SEGURANÇA DE E-MAIL - REDE COMUNITÁRIA VILA AURORA
+# Domínio Fictício: rede-vilaaurora.org.br
+# Cumpre o requisito RT-10: Proteção contra spoofing (SPF, DKIM e DMARC)[cite: 4].
+# ==============================================================================
+
+# 1. SPF (Sender Policy Framework)
+# Define quais os servidores IP estão autorizados a enviar e-mails em nome do domínio.
+# O "~all" (SoftFail) atua em conjunto com o DMARC para isolar mensagens não autorizadas.
+Nome: @ (rede-vilaaurora.org.br)
+Tipo: TXT
+Valor: "v=spf1 mx a ip4:10.13.13.1 include:_spf.servidoremail.com ~all"
+
+# 2. DKIM (DomainKeys Identified Mail)
+# Garante a integridade da mensagem através de assinatura criptográfica.
+# O seletor utilizado é "default".
+Nome: default._domainkey
+Tipo: TXT
+Valor: "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyz"
+
+# 3. DMARC (Domain-based Message Authentication, Reporting, and Conformance)
+# RT-10 exige explicitamente política mínima de "quarantine"[cite: 4].
+# Obriga o servidor de destino a enviar para o Spam/Quarentena mensagens que falhem o SPF ou DKIM.
+Nome: _dmarc
+Tipo: TXT
+Valor: "v=DMARC1; p=quarantine; rua=mailto:admin_seguranca@rede-vilaaurora.org.br; ruf=mailto:admin_seguranca@rede-vilaaurora.org.br; fo=1; aspf=s; adkim=s;"

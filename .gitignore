@@ -1,0 +1,13 @@
+# Segredos, chaves privadas e certificados mTLS
+*.key
+*.csr
+edge_node/mqtt_broker/certs/*.crt
+edge_node/mqtt_broker/certs/*.key
+edge_node/mqtt_broker/certs/*.srl
+
+# Arquivos de ambiente e logs locais
+.env
+__pycache__/
+*.pyc
+downloads/
+.DS_Store

@@ -1,0 +1,71 @@
+<!--
+===================================================================================
+REGRAS PERSONALIZADAS DE DETEÇÃO (SIEM WAZUH) - REDE COMUNITÁRIA VILA AURORA
+Cumpre o requisito RT-13: Regras para SQLi, VPN anómala e comandos anómalos[cite: 4].
+===================================================================================
+-->
+
+<group name="vila_aurora, web_dashboard, vpn, edge_node">
+
+  <!-- ==========================================
+       DETEÇÃO 1: PADRÃO DE SQL INJECTION (RT-13 b)[cite: 4]
+       ========================================== -->
+  <rule id="100001" level="12">
+    <if_sid>31100</if_sid> <!-- Regras de acesso web base -->
+    <match>SELECT |UNION |INSERT |UPDATE |DELETE |DROP |--|%27</match>
+    <regex>(?i)(union.+select|select.+from|insert.+into|drop.+table|--|%27|')</regex>
+    <description>[INC-VA-0712] Potencial tentativa de SQL Injection no Web Dashboard.</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>attack_sqli, pci_dss_6.5.1</group>
+  </rule>
+
+  <!-- ==========================================
+       DETEÇÃO 2: LOGIN VPN ANÓMALO (RT-13 a)[cite: 4]
+       Exemplo: Acesso fora do país ou horário incomum
+       ========================================== -->
+  <rule id="100002" level="10">
+    <decoded_as>wireguard</decoded_as>
+    <match>Handshake for peer</match>
+    <description>Nova ligação VPN (WireGuard) estabelecida.</description>
+  </rule>
+
+  <!-- Regra dependente para horário anómalo (ex: Madrugada) -->
+  <rule id="100003" level="12">
+    <if_sid>100002</if_sid>
+    <time>00:00 - 05:00</time>
+    <description>[INC-VA-0712] Login VPN detetado em horário de risco (Madrugada).</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+  </rule>
+
+  <!-- ==========================================
+       DETEÇÃO 3: COMANDO DE ATUADOR FORA DO PERFIL (RT-13 d)[cite: 4]
+       Monitoriza logs MQTT/Aplicação para perfis não autorizados
+       ========================================== -->
+  <rule id="100004" level="13">
+    <decoded_as>json</decoded_as>
+    <field name="acao">comando_bomba_agua|comando_fechadura|desligar_gerador</field>
+    <field name="usuario">maria_voluntaria|joao_ti</field> <!-- Perfis que não deveriam executar comandos críticos diretos -->
+    <description>ALERTA CRÍTICO: Utilizador sem privilégios ({usuario}) tentou acionar atuador crítico ({acao}).</description>
+    <mitre>
+      <id>T1068</id>
+    </mitre>
+    <group>privilege_escalation, iot_security</group>
+  </rule>
+
+  <!-- ==========================================
+       DETEÇÃO 4: DISPOSITIVO SEM CERTIFICADO VÁLIDO (RT-13 c)[cite: 4]
+       ========================================== -->
+  <rule id="100005" level="12">
+    <decoded_as>mosquitto</decoded_as>
+    <match>certificate verify failed|unauthorized</match>
+    <description>Dispositivo IoT tentou conectar-se sem certificado válido (mTLS falhou).</description>
+    <mitre>
+      <id>T1552.004</id>
+    </mitre>
+  </rule>
+
+</group>

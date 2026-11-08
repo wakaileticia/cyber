@@ -1,0 +1,118 @@
+
+services:
+  # --------------------------------------------------------
+  # CAMADA DE BORDA / CAMPO (IoT & MQTT)
+  # --------------------------------------------------------
+  mqtt_broker:
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt_broker
+    restart: unless-stopped
+    ports:
+      - "8883:8883" # Porta com mTLS exigido
+    volumes:
+      - ./edge_node/mqtt_broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./edge_node/mqtt_broker/certs:/mosquitto/config/certs:ro
+    networks:
+      - iot_net
+      - simulacao_wan # Rede para o teste de caos (RT-23)
+
+  edge_node_app:
+    build: 
+      context: ./edge_node
+    container_name: edge_node_app
+    restart: always
+    environment:
+      - MQTT_HOST=mqtt_broker
+      - MQTT_PORT=8883
+    networks:
+      - iot_net
+      - simulacao_wan
+
+  # --------------------------------------------------------
+  # CAMADA DE SERVIÇOS / NUVEM (Banco de dados & Web)
+  # --------------------------------------------------------
+  db:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin_user
+      POSTGRES_PASSWORD: super_secure_password_123
+      POSTGRES_DB: vila_aurora_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - db_net
+
+  web_dashboard:
+    build:
+      context: ./web_dashboard
+    container_name: web_dashboard
+    restart: always
+    ports:
+      - "8080:8080" # Versão vulnerável para testes laboratório
+      - "8443:8443" # Versão segura HTTPS
+    environment:
+      - DB_HOST=db
+      - DB_USER=app_user # Privilégio mínimo (RT-08)
+      - DB_PASS=app_password
+      - DB_NAME=vila_aurora_db
+    depends_on:
+      - db
+    networks:
+      - db_net
+      - admin_net
+      - simulacao_wan
+
+  # --------------------------------------------------------
+  # SEGURANÇA E ACESSO (VPN & SIEM)
+  # --------------------------------------------------------
+  wireguard:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Sao_Paulo
+      - PEERS=3 # Operador, Técnico, Coordenador (RT-09)
+    volumes:
+      - ./pki_vpn/wireguard:/config
+      - /lib/modules:/lib/modules
+    ports:
+      - "51820:51820/udp"
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    networks:
+      - admin_net
+
+  wazuh_manager:
+    image: wazuh/wazuh-manager:4.5.3
+    container_name: wazuh_manager
+    restart: always
+    ports:
+      - "1514:1514" # Coleta de logs dos agentes
+      - "55000:55000" # API
+    networks:
+      - admin_net
+      - simulacao_wan
+
+# --------------------------------------------------------
+# SEGMENTAÇÃO DE REDES (RT-07) E VOLUMES
+# --------------------------------------------------------
+networks:
+  iot_net:
+    driver: bridge
+    internal: true # Isolado da internet
+  db_net:
+    driver: bridge
+    internal: true # Isolado, apenas o web_dashboard acessa
+  admin_net:
+    driver: bridge # Acesso administrativo via VPN
+  simulacao_wan:
+    driver: bridge # Rede externa simulada (pode ser derrubada para teste de caos)
+
+volumes:
+  db_data:
